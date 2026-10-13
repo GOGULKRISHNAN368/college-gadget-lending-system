@@ -7,9 +7,10 @@
   gather_facts: false
 
   tasks:
-    - name: Build Docker image
+    - name: Build Docker image with Ansible tag
       community.docker.docker_image:
         name: gadget-lending-portal
+        tag: ansible
         source: build
         build:
           path: "{{ playbook_dir }}"
@@ -17,16 +18,16 @@
 
     - name: Run Gadget Lending Portal container
       community.docker.docker_container:
-        name: gadget-portal
-        image: gadget-lending-portal
+        name: gadget-portal-ansible
+        image: gadget-lending-portal:ansible
         state: started
         restart_policy: unless-stopped
         published_ports:
-          - "5000:5000"
+          - "5001:5000"
 
     - name: Verify application response
       ansible.builtin.uri:
-        url: http://localhost:5000
+        url: http://localhost:5001
         method: GET
         status_code: 200
       register: app_response
