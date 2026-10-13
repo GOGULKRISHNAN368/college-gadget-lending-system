@@ -8,18 +8,12 @@ pipeline {
                 bat '''
                     @echo off
                     echo ===== PYTHON =====
-                    py -3.11 --version
+                    "C:\\Users\\rekha\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe" --version
 
                     echo ===== DOCKER =====
-                    docker --version
-                    docker info
+                    "C:\\Users\\rekha\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" --version
+                    "C:\\Users\\rekha\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" info
                 '''
-            }
-        }
-
-        stage('Checkout Project') {
-            steps {
-                echo 'Project source is checked out by Jenkins from SCM.'
             }
         }
 
@@ -36,7 +30,7 @@ pipeline {
             steps {
                 bat '''
                     @echo off
-                    docker ps
+                    "C:\\Users\\rekha\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" ps
                     curl.exe -f http://localhost:5000
                 '''
             }
