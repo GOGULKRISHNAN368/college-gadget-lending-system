@@ -1,0 +1,35 @@
+
+---
+- name: Deploy Gadget Lending Portal
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: Build Docker image
+      community.docker.docker_image:
+        name: gadget-lending-portal
+        source: build
+        build:
+          path: "{{ playbook_dir }}"
+        state: present
+
+    - name: Run Gadget Lending Portal container
+      community.docker.docker_container:
+        name: gadget-portal
+        image: gadget-lending-portal
+        state: started
+        restart_policy: unless-stopped
+        published_ports:
+          - "5000:5000"
+
+    - name: Verify application response
+      ansible.builtin.uri:
+        url: http://localhost:5000
+        method: GET
+        status_code: 200
+      register: app_response
+      retries: 5
+      delay: 3
+      until: app_response.status == 200
