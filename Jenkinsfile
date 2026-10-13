@@ -21,38 +21,22 @@ pipeline {
 
                     echo Checking Python 3.11...
 
-                    set "PYTHON_CMD="
-
-                    py -3.11 --version >nul 2>&1
-                    if not errorlevel 1 (
-                        set "PYTHON_CMD=py -3.11"
-                    )
-
-                    if not defined PYTHON_CMD (
-                        if exist "C:\\Users\\rekha\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe" (
-                            set "PYTHON_CMD=C:\\Users\\rekha\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe"
-                        )
-                    )
-
-                    if not defined PYTHON_CMD (
-                        echo ERROR: Python 3.11 was not found.
+                    py -3.11 --version
+                    if errorlevel 1 (
+                        echo ERROR: Python 3.11 is unavailable to Jenkins.
                         exit /b 1
                     )
 
-                    %PYTHON_CMD% --version
-                    %PYTHON_CMD% -m pip --version
+                    py -3.11 -m pip --version
+                    if errorlevel 1 exit /b 1
 
-                    echo Installing project dependencies...
-
-                    %PYTHON_CMD% -m pip install -r requirements.txt
+                    echo Installing requirements...
+                    py -3.11 -m pip install -r requirements.txt
                     if errorlevel 1 exit /b 1
 
                     echo Checking Python syntax...
-
-                    %PYTHON_CMD% -c "import pathlib, sys; files=list(pathlib.Path('.').rglob('*.py')); files=[f for f in files if '.venv' not in f.parts and 'venv' not in f.parts and 'site-packages' not in f.parts]; print('Python files found:', len(files)); [compile(f.read_text(encoding='utf-8'), str(f), 'exec') for f in files]; print('Syntax check passed.')"
+                    py -3.11 -c "import pathlib; files=[p for p in pathlib.Path('.').rglob('*.py') if '.venv' not in p.parts and 'venv' not in p.parts]; print('Checking', len(files), 'Python files'); [compile(p.read_text(encoding='utf-8'), str(p), 'exec') for p in files]; print('Syntax check passed')"
                     if errorlevel 1 exit /b 1
-
-                    echo Build and syntax check completed successfully.
                 '''
             }
         }
@@ -66,25 +50,22 @@ pipeline {
                     set "DOCKER=C:\\Users\\rekha\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe"
 
                     if not exist "%DOCKER%" (
-                        set "DOCKER=docker"
-                    )
-
-                    echo Checking Docker...
-
-                    "%DOCKER%" --version
-                    if errorlevel 1 (
-                        echo ERROR: Docker is not accessible to Jenkins.
+                        echo ERROR: Docker executable not found.
                         exit /b 1
                     )
 
+                    echo Checking Docker client...
+                    "%DOCKER%" --version
+                    if errorlevel 1 exit /b 1
+
+                    echo Checking Docker engine access...
                     "%DOCKER%" info
                     if errorlevel 1 (
-                        echo ERROR: Docker Desktop engine is not running or accessible.
+                        echo ERROR: Jenkins cannot access the Docker engine.
                         exit /b 1
                     )
 
-                    echo Pulling a small test image...
-
+                    echo Running smoke test...
                     "%DOCKER%" run --rm hello-world
                     if errorlevel 1 exit /b 1
 
@@ -98,13 +79,11 @@ pipeline {
         always {
             echo 'Pipeline execution finished.'
         }
-
         success {
-            echo 'SUCCESS: All pipeline stages passed.'
+            echo 'SUCCESS: All stages passed.'
         }
-
         failure {
-            echo 'FAILURE: Check the console output for the failed stage.'
+            echo 'FAILURE: Check the failed stage in Console Output.'
         }
     }
 }
