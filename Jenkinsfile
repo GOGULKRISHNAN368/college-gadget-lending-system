@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -6,31 +7,37 @@ pipeline {
             steps {
                 bat '''
                     @echo off
-                    setlocal
-
                     echo ===== PYTHON =====
-
-                    set "PYTHON=C:\\Users\\rekha\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe"
-
-                    if exist "%PYTHON%" (
-                        "%PYTHON%" --version
-                        "%PYTHON%" -m pip --version
-                    ) else (
-                        echo Python executable not accessible at this path.
-                        exit /b 1
-                    )
+                    py -3.11 --version
 
                     echo ===== DOCKER =====
+                    docker --version
+                    docker info
+                '''
+            }
+        }
 
-                    set "DOCKER=C:\\Users\\rekha\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe"
+        stage('Checkout Project') {
+            steps {
+                echo 'Project source is checked out by Jenkins from SCM.'
+            }
+        }
 
-                    if exist "%DOCKER%" (
-                        "%DOCKER%" --version
-                        "%DOCKER%" info
-                    ) else (
-                        echo Docker executable not accessible at this path.
-                        exit /b 1
-                    )
+        stage('Deploy Using Ansible') {
+            steps {
+                bat '''
+                    @echo off
+                    wsl -d Ubuntu -- bash -lc "cd '/mnt/d/devops cat/devapps-cat2' && ansible-playbook ansible-playbook.yml"
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                bat '''
+                    @echo off
+                    docker ps
+                    curl.exe -f http://localhost:5000
                 '''
             }
         }
