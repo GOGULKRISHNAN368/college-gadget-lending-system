@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}Return Confirmation{% endblock %}
+{% block content %}<section class="panel"><h1>Return Confirmation</h1><p class="muted">Confirm a return after the borrowed gadget has physically been handed back. This restores inventory.</p>
+<div class="table-wrap"><table><thead><tr>{% if session.get('role') == 'admin' %}<th>Student</th>{% endif %}<th>Gadget</th><th>Qty</th><th>Approved at</th><th>Action</th></tr></thead><tbody>
+{% for loan in loans %}<tr>{% if session.get('role') == 'admin' %}<td>{{ loan.student_name }}</td>{% endif %}<td>{{ loan.gadget_name }}</td><td>{{ loan.quantity }}</td><td>{{ loan.approved_at or '—' }}</td><td><form method="post" action="{{ url_for('confirm_return', loan_id=loan.id) }}" onsubmit="return confirm('Confirm this gadget has been returned?')"><button class="success" type="submit">Confirm Return</button></form></td></tr>
+{% else %}<tr><td colspan="5">No approved loans waiting for return.</td></tr>{% endfor %}
+</tbody></table></div></section>{% endblock %}

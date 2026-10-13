@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Gadget Inventory{% endblock %}
+{% block content %}<section class="panel"><h1>Gadget Inventory</h1><p class="muted">Check availability and submit a borrowing request. Requests remain pending until an administrator reviews them.</p>
+<div class="grid">{% for gadget in gadgets %}<article class="card">
+<h2>{{ gadget.name }}</h2><p class="muted">{{ gadget.category }}</p>
+<p>Available: <strong>{{ gadget.available_quantity }}</strong> / {{ gadget.total_quantity }}</p>
+{% if session.get('role') != 'admin' and gadget.available_quantity > 0 %}
+<form method="post" action="{{ url_for('borrow', gadget_id=gadget.id) }}">
+<label>Quantity</label><input type="number" name="quantity" min="1" max="{{ gadget.available_quantity }}" value="1" required>
+<label>Purpose</label><input name="purpose" required maxlength="250" placeholder="Why do you need this gadget?">
+<button type="submit">Request to Borrow</button>
+</form>
+{% elif gadget.available_quantity == 0 %}<span class="pill">Currently unavailable</span>{% endif %}
+</article>{% else %}<p>No gadgets in inventory.</p>{% endfor %}</div></section>{% endblock %}

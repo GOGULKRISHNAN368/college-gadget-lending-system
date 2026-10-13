@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Manage Gadgets{% endblock %}
+{% block content %}<section class="panel"><h1>Manage Gadget Inventory</h1><form method="post" class="grid">
+<div><label>Gadget name</label><input name="name" required></div><div><label>Category</label><input name="category" required></div><div><label>Quantity</label><input type="number" name="quantity" min="1" required></div><div style="align-self:end"><button type="submit">Add Gadget</button></div>
+</form></section><section class="panel"><h2>Current inventory</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Total</th><th>Available</th></tr></thead><tbody>{% for g in gadgets %}<tr><td>{{ g.name }}</td><td>{{ g.category }}</td><td>{{ g.total_quantity }}</td><td>{{ g.available_quantity }}</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}

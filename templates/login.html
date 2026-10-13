@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Login{% endblock %}
+{% block content %}<section class="panel" style="max-width:520px;margin:35px auto">
+<h1>Login</h1><p class="muted">Sign in to access the gadget lending system.</p>
+<form method="post">
+<label>Email address</label><input type="email" name="email" required placeholder="you@example.com">
+<label>Password</label><input type="password" name="password" required>
+<button type="submit">Login</button>
+</form><p>New student? <a href="{{ url_for('register') }}">Register here</a></p>
+<p class="muted">Demo administrator: admin@devapps.local / Admin123!</p></section>{% endblock %}

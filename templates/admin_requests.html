@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}Admin Approval{% endblock %}
+{% block content %}<section class="panel"><h1>Admin — Approval / Rejection</h1><p class="muted">Review pending requests. Approval decreases available stock; rejection leaves inventory unchanged.</p>
+<div class="table-wrap"><table><thead><tr><th>Student</th><th>Email</th><th>Gadget</th><th>Qty</th><th>Purpose</th><th>Available</th><th>Status</th><th>Action</th></tr></thead><tbody>
+{% for loan in loans %}<tr><td>{{ loan.student_name }}</td><td>{{ loan.email }}</td><td>{{ loan.gadget_name }}</td><td>{{ loan.quantity }}</td><td>{{ loan.purpose }}</td><td>{{ loan.available_quantity }}</td><td><span class="pill">{{ loan.status }}</span></td><td>
+{% if loan.status == 'Pending' %}
+<form class="inline" method="post" action="{{ url_for('decide_loan', loan_id=loan.id, action='approve') }}"><button class="success" type="submit">Approve</button></form>
+<form class="inline" method="post" action="{{ url_for('decide_loan', loan_id=loan.id, action='reject') }}"><button class="danger" type="submit">Reject</button></form>
+{% else %}—{% endif %}</td></tr>
+{% else %}<tr><td colspan="8">No requests found.</td></tr>{% endfor %}
+</tbody></table></div></section>{% endblock %}

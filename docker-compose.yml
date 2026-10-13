@@ -1,0 +1,17 @@
+services:
+  gadget-lending:
+    build: .
+    container_name: devapps-cat2
+    ports:
+      - "5000:5000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-this-before-deployment}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@devapps.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+      DATABASE_PATH: /data/gadget_lending.db
+    volumes:
+      - gadget_data:/data
+    restart: unless-stopped
+
+volumes:
+  gadget_data:

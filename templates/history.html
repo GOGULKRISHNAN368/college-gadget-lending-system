@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}Lending History{% endblock %}
+{% block content %}<section class="panel"><h1>{% if session.get('role') == 'admin' %}Complete Lending History{% else %}My Lending History{% endif %}</h1>
+<div class="table-wrap"><table><thead><tr>{% if session.get('role') == 'admin' %}<th>Student</th>{% endif %}<th>Gadget</th><th>Qty</th><th>Purpose</th><th>Requested</th><th>Approved</th><th>Returned</th><th>Status</th></tr></thead><tbody>
+{% for loan in loans %}<tr>{% if session.get('role') == 'admin' %}<td>{{ loan.student_name }}</td>{% endif %}<td>{{ loan.gadget_name }}</td><td>{{ loan.quantity }}</td><td>{{ loan.purpose }}</td><td>{{ loan.requested_at }}</td><td>{{ loan.approved_at or '—' }}</td><td>{{ loan.returned_at or '—' }}</td><td><span class="pill">{{ loan.status }}</span></td></tr>
+{% else %}<tr><td colspan="8">No lending history yet.</td></tr>{% endfor %}
+</tbody></table></div></section>{% endblock %}
