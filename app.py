@@ -1,62 +1,79 @@
 import os
 import sqlite3
 from functools import wraps
+from contextlib import closing
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
-DB_PATH = os.environ.get("DATABASE_PATH", "gadget_lending.db")
+DB_PATH = os.environ.get("DATABASE_PATH", os.environ.get("DATABASE", "gadget_lending.db"))
+DATABASE = DB_PATH
+
+
+def get_db_path():
+    return DATABASE or DB_PATH or "gadget_lending.db"
+
+
+def initialize_schema(conn):
+    conn.executescript("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'student'
+    );
+    CREATE TABLE IF NOT EXISTS gadgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        total_quantity INTEGER NOT NULL DEFAULT 1,
+        available_quantity INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS loans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        gadget_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        purpose TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Pending',
+        requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        approved_at TEXT,
+        returned_at TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(gadget_id) REFERENCES gadgets(id)
+    );
+    """)
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@devapps.local")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123!")
+    admin = conn.execute("SELECT id FROM users WHERE email=?", (admin_email,)).fetchone()
+    if not admin:
+        conn.execute("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)",
+                     ("Administrator", admin_email, generate_password_hash(admin_password), "admin"))
+        conn.commit()
+    if conn.execute("SELECT COUNT(*) AS n FROM gadgets").fetchone()["n"] == 0:
+        conn.executemany(
+            "INSERT INTO gadgets(name,category,total_quantity,available_quantity) VALUES(?,?,?,?)",
+            [("Laptop", "Computer", 8, 8), ("Projector", "Presentation", 3, 3),
+             ("Arduino Kit", "Electronics", 10, 10), ("Digital Camera", "Media", 4, 4)]
+        )
+        conn.commit()
+
 
 def db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(get_db_path())
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    initialize_schema(conn)
     return conn
 
+
 def init_db():
-    with db() as conn:
-        conn.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'student'
-        );
-        CREATE TABLE IF NOT EXISTS gadgets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            total_quantity INTEGER NOT NULL DEFAULT 1,
-            available_quantity INTEGER NOT NULL DEFAULT 1
-        );
-        CREATE TABLE IF NOT EXISTS loans (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            gadget_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL DEFAULT 1,
-            purpose TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Pending',
-            requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            approved_at TEXT,
-            returned_at TEXT,
-            FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(gadget_id) REFERENCES gadgets(id)
-        );
-        """)
-        admin_email = os.environ.get("ADMIN_EMAIL", "admin@devapps.local")
-        admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123!")
-        admin = conn.execute("SELECT id FROM users WHERE email=?", (admin_email,)).fetchone()
-        if not admin:
-            conn.execute("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)",
-                         ("Administrator", admin_email, generate_password_hash(admin_password), "admin"))
-        if conn.execute("SELECT COUNT(*) AS n FROM gadgets").fetchone()["n"] == 0:
-            conn.executemany(
-                "INSERT INTO gadgets(name,category,total_quantity,available_quantity) VALUES(?,?,?,?)",
-                [("Laptop", "Computer", 8, 8), ("Projector", "Presentation", 3, 3),
-                 ("Arduino Kit", "Electronics", 10, 10), ("Digital Camera", "Media", 4, 4)]
-            )
+    with closing(sqlite3.connect(get_db_path())) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        initialize_schema(conn)
 
 def login_required(fn):
     @wraps(fn)
@@ -79,6 +96,11 @@ def admin_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+@app.route("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.route("/")
 def home():
     if session.get("user_id"):
@@ -95,9 +117,10 @@ def register():
             flash("Enter your name, a valid email, and a password of at least 6 characters.", "danger")
         else:
             try:
-                with db() as conn:
+                with closing(db()) as conn:
                     conn.execute("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,'student')",
                                  (name, email, generate_password_hash(password)))
+                    conn.commit()
                 flash("Registration successful. You can now log in.", "success")
                 return redirect(url_for("login"))
             except sqlite3.IntegrityError:
@@ -110,7 +133,7 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
-        with db() as conn:
+        with closing(db()) as conn:
             user = conn.execute(
                 "SELECT * FROM users WHERE email = ?",
                 (email,)
@@ -149,7 +172,7 @@ def logout():
 @app.route("/inventory")
 @login_required
 def inventory():
-    with db() as conn:
+    with closing(db()) as conn:
         gadgets = conn.execute("SELECT * FROM gadgets ORDER BY name").fetchall()
     return render_template("inventory.html", gadgets=gadgets)
 
@@ -164,7 +187,7 @@ def borrow(gadget_id):
         quantity = int(request.form.get("quantity", "1"))
     except ValueError:
         quantity = 0
-    with db() as conn:
+    with closing(db()) as conn:
         gadget = conn.execute("SELECT * FROM gadgets WHERE id=?", (gadget_id,)).fetchone()
         if not gadget:
             flash("Gadget not found.", "danger")
@@ -175,13 +198,14 @@ def borrow(gadget_id):
         else:
             conn.execute("INSERT INTO loans(user_id,gadget_id,quantity,purpose) VALUES(?,?,?,?)",
                          (session["user_id"], gadget_id, quantity, purpose))
+            conn.commit()
             flash("Borrowing request submitted for admin approval.", "success")
     return redirect(url_for("requests_page"))
 
 @app.route("/requests")
 @login_required
 def requests_page():
-    with db() as conn:
+    with closing(db()) as conn:
         if session.get("role") == "admin":
             loans = conn.execute("""SELECT l.*,u.name AS student_name,g.name AS gadget_name
                 FROM loans l JOIN users u ON u.id=l.user_id JOIN gadgets g ON g.id=l.gadget_id
@@ -195,7 +219,7 @@ def requests_page():
 @app.route("/admin/requests")
 @admin_required
 def admin_requests():
-    with db() as conn:
+    with closing(db()) as conn:
         loans = conn.execute("""SELECT l.*,u.name AS student_name,u.email,g.name AS gadget_name,
             g.available_quantity FROM loans l JOIN users u ON u.id=l.user_id
             JOIN gadgets g ON g.id=l.gadget_id ORDER BY
@@ -208,13 +232,14 @@ def decide_loan(loan_id, action):
     if action not in ("approve", "reject"):
         flash("Invalid action.", "danger")
         return redirect(url_for("admin_requests"))
-    with db() as conn:
+    with closing(db()) as conn:
         loan = conn.execute("""SELECT l.*,g.available_quantity,g.name AS gadget_name
             FROM loans l JOIN gadgets g ON g.id=l.gadget_id WHERE l.id=?""", (loan_id,)).fetchone()
         if not loan or loan["status"] != "Pending":
             flash("This request no longer has a pending status.", "warning")
         elif action == "reject":
             conn.execute("UPDATE loans SET status='Rejected' WHERE id=?", (loan_id,))
+            conn.commit()
             flash("Borrowing request rejected.", "info")
         elif loan["quantity"] > loan["available_quantity"]:
             flash("Not enough available quantity to approve this request.", "danger")
@@ -222,13 +247,14 @@ def decide_loan(loan_id, action):
             conn.execute("UPDATE gadgets SET available_quantity=available_quantity-? WHERE id=?",
                          (loan["quantity"], loan["gadget_id"]))
             conn.execute("UPDATE loans SET status='Approved', approved_at=CURRENT_TIMESTAMP WHERE id=?", (loan_id,))
+            conn.commit()
             flash("Borrowing request approved.", "success")
     return redirect(url_for("admin_requests"))
 
 @app.route("/returns")
 @login_required
 def returns_page():
-    with db() as conn:
+    with closing(db()) as conn:
         if session.get("role") == "admin":
             loans = conn.execute("""SELECT l.*,u.name AS student_name,g.name AS gadget_name
                 FROM loans l JOIN users u ON u.id=l.user_id JOIN gadgets g ON g.id=l.gadget_id
@@ -242,7 +268,7 @@ def returns_page():
 @app.route("/return/<int:loan_id>", methods=["POST"])
 @login_required
 def confirm_return(loan_id):
-    with db() as conn:
+    with closing(db()) as conn:
         loan = conn.execute("SELECT * FROM loans WHERE id=?", (loan_id,)).fetchone()
         allowed = loan and loan["status"] == "Approved" and (
             session.get("role") == "admin" or loan["user_id"] == session.get("user_id"))
@@ -252,13 +278,14 @@ def confirm_return(loan_id):
             conn.execute("UPDATE loans SET status='Returned', returned_at=CURRENT_TIMESTAMP WHERE id=?", (loan_id,))
             conn.execute("UPDATE gadgets SET available_quantity=available_quantity+? WHERE id=?",
                          (loan["quantity"], loan["gadget_id"]))
+            conn.commit()
             flash("Return confirmed and inventory updated.", "success")
     return redirect(url_for("returns_page"))
 
 @app.route("/history")
 @login_required
 def history():
-    with db() as conn:
+    with closing(db()) as conn:
         if session.get("role") == "admin":
             loans = conn.execute("""SELECT l.*,u.name AS student_name,g.name AS gadget_name
                 FROM loans l JOIN users u ON u.id=l.user_id JOIN gadgets g ON g.id=l.gadget_id
@@ -280,14 +307,15 @@ def manage_gadgets():
         except ValueError:
             quantity = 0
         if name and category and quantity > 0:
-            with db() as conn:
+            with closing(db()) as conn:
                 conn.execute("INSERT INTO gadgets(name,category,total_quantity,available_quantity) VALUES(?,?,?,?)",
                              (name, category, quantity, quantity))
+                conn.commit()
             flash("Gadget added to inventory.", "success")
         else:
             flash("Enter a name, category, and quantity greater than zero.", "danger")
         return redirect(url_for("manage_gadgets"))
-    with db() as conn:
+    with closing(db()) as conn:
         gadgets = conn.execute("SELECT * FROM gadgets ORDER BY name").fetchall()
     return render_template("manage_gadgets.html", gadgets=gadgets)
 

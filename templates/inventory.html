@@ -1,5 +1,5 @@
-{% extends "base.html" %}{% block title %}Gadget Inventory{% endblock %}
-{% block content %}<section class="panel"><h1>Gadget Inventory</h1><p class="muted">Check availability and submit a borrowing request. Requests remain pending until an administrator reviews them.</p>
+{% extends "base.html" %}{% block title %}Gadget inventory{% endblock %}
+{% block content %}<section class="panel"><h1>Gadget inventory</h1><p class="muted">Check availability and submit a borrowing request. Requests remain pending until an administrator reviews them.</p>
 <div class="grid">{% for gadget in gadgets %}<article class="card">
 <h2>{{ gadget.name }}</h2><p class="muted">{{ gadget.category }}</p>
 <p>Available: <strong>{{ gadget.available_quantity }}</strong> / {{ gadget.total_quantity }}</p>
